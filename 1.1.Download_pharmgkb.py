@@ -9,6 +9,11 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-class PGX_DBDownloader:
-    def __init__(self, data_dir):
+class PharmGKB_arthiritis_downloader:
+    def __init__(self):
+        self.base_url = "https://api.pharmgkb.org/"
+
+
+    def make_request(self):
+        
         
