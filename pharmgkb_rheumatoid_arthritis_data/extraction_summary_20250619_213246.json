@@ -1,0 +1,15 @@
+{
+  "disease": "rheumatoid arthritis",
+  "extraction_date": "2025-06-19T21:32:46.387985",
+  "total_records": 939,
+  "data_types": {
+    "clinical_annotations": 0,
+    "variant_annotations": 0,
+    "drug_labels": 919,
+    "guidelines": 0,
+    "pathways": 0,
+    "genes": 12,
+    "chemicals": 8,
+    "variants": 0
+  }
+}
