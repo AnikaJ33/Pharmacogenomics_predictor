@@ -5,6 +5,180 @@ import pandas as pd
 from datetime import datetime
 import os
 
+#List of genes associated with rheumatoid arthiritis based on literature search - extract all data associated with them
+gene_list_RA = [ # HLA Genes (Strongest Overall Risk)
+    
+
+
+
+
+
+    
+    "HLA-DRB1",
+    "HLA-B",
+    "HLA-MICA",
+    
+    # Major Non-HLA Risk Genes
+    "PTPN22",  # Second strongest association after HLA
+    "STAT4",   # Signal transducer and activator of transcription 4
+    
+    # Immune System Genes
+    "IL6ST",   # Interleukin 6 signal transducer
+    "IRF5",    # Interferon regulatory factor 5
+    "CCR6",    # C-C motif chemokine receptor 6
+    "TRAF1",   # TNF receptor associated factor 1
+    "CTLA4",   # Cytotoxic T-lymphocyte associated protein 4
+    "FCGR3A",  # Fc gamma receptor IIIA
+    "FCGR2B",  # Fc gamma receptor IIb (B cell specific)
+    "IL2RA",   # Interleukin 2 receptor subunit alpha
+    "IL2RB",   # Interleukin 2 receptor subunit beta
+    "CCL21",   # C-C motif chemokine ligand 21
+    "CD40",    # CD40 molecule
+    "IL23R",   # Interleukin 23 receptor
+    "PADI4",   # Peptidyl arginine deiminase 4 (stronger in Asian populations)
+    
+    # TNF Pathway Genes
+    "C5",      # Complement component 5 (TRAF1-C5 region)
+    "TNIP2",   # TNFAIP3 interacting protein 2
+    "TNFRSF11A", # TNF receptor superfamily member 11a
+    "TNFAIP3", # TNF alpha induced protein 3
+    
+    # Novel Loci from Recent Studies
+    "SPRED2",  # Sprouty related EVH1 domain containing 2
+    "RBPJ",    # Recombination signal binding protein
+    "PXK",     # PX domain containing serine/threonine kinase
+    "AFF3",    # AF4/FMR2 family member 3
+    "WISP1",   # WNT1 inducible signaling pathway protein 1
+    "LEF1",    # Lymphoid enhancer binding factor 1
+    
+    # Additional Confirmed Risk Loci
+    "CD226",   # CD226 molecule
+    "CDK6",    # Cyclin dependent kinase 6
+    "MBP",     # Myelin basic protein
+    "BLK",     # BLK proto-oncogene
+    "REL",     # REL proto-oncogene
+    "KIF5A",   # Kinesin family member 5A
+    "PRKCQ",   # Protein kinase C theta
+    "MMEL1",   # Membrane metalloendopeptidase like 1
+    
+    # Asian Population-Specific
+    "CEP57",   # Centrosomal protein 57
+    "C5orf30", # Chromosome 5 open reading frame 30
+    "GATA3",   # GATA binding protein 3
+    "VPS37C",  # VPS37C subunit of ESCRT-I
+    "EOMES",   # Eomesodermin
+    "LINC00824", # Long intergenic non-protein coding RNA 824
+    
+    # TWAS Identified Genes
+    "CRIPAK",  # Cysteine rich PAK1 interactor
+    "MUT",     # Methylmalonyl-CoA mutase
+    "FOXRED1", # FAD dependent oxidoreductase domain containing 1
+    "EBPL",    # Emopamil binding protein like
+    
+    # Newly Identified Susceptibility Loci
+    "IL12RB2", # Interleukin 12 receptor subunit beta 2
+    "PLCL1",   # Phospholipase C like 1 (BOLL-PLCL1 region)
+    "BOLL",    # Boule homolog
+    "CCR2",    # C-C motif chemokine receptor 2
+    "TCF7",    # Transcription factor 7
+    "IQGAP1",  # IQ motif containing GTPase activating protein 1
+    
+    # Shared Autoimmune Disease Loci
+    "IL2",     # Interleukin 2 (IL2/IL21 region)
+    "IL21",    # Interleukin 21
+    "ZEB1",    # Zinc finger E-box binding homeobox 1
+    "SH2B3",   # SH2B adaptor protein 3
+    "IKZF3",   # IKAROS family zinc finger 3
+    "UBASH3A", # Ubiquitin associated and SH3 domain containing A
+    
+    # Additional Cytokine and Immune Genes
+    "TYK2",    # Tyrosine kinase 2
+    "JAK2",    # Janus kinase 2
+    "IFNG",    # Interferon gamma
+    "TNF",     # Tumor necrosis factor
+    "NFKB1",   # Nuclear factor kappa B subunit 1
+    "CD2",     # CD2 molecule
+    "CD28",    # CD28 molecule
+    
+    # Complement and Coagulation
+    "CFH",     # Complement factor H
+    "C4A",     # Complement C4A
+    "C4B",     # Complement C4B
+    
+    # Transcription Factors and Regulators
+    "RUNX1",   # RUNX family transcription factor 1
+    "ETS1",    # ETS proto-oncogene 1
+    "BACH2",   # BTB domain and CNC homolog 2
+    "NFKBIE",  # NFKB inhibitor epsilon
+    
+    # Signaling Pathways
+    "RASGRP1", # RAS guanyl releasing protein 1
+    "TAGAP",   # T cell activation RhoGTPase activating protein
+    "PTPRC",   # Protein tyrosine phosphatase receptor type C
+    "LYN",     # LYN proto-oncogene
+    "CARD11",  # Caspase recruitment domain family member 11
+    
+    # Adhesion and Migration
+    "ICAM1",   # Intercellular adhesion molecule 1
+    "VCAM1",   # Vascular cell adhesion molecule 1
+    "ITGB3",   # Integrin subunit beta 3
+    "ITGA4",   # Integrin subunit alpha 4
+    
+    # Matrix and Structural
+    "COL1A2",  # Collagen type I alpha 2 chain
+    "COL3A1",  # Collagen type III alpha 1 chain
+    "COL6A1",  # Collagen type VI alpha 1 chain
+    "TGFB1",   # Transforming growth factor beta 1
+    
+    # Metabolic and Enzymatic
+    "PSMC3",   # Proteasome 26S subunit, ATPase 3
+    "PSMB8",   # Proteasome subunit beta 8
+    "CYP26B1", # Cytochrome P450 family 26 subfamily B member 1
+    "FGF18",   # Fibroblast growth factor 18
+    "FGFR3",   # Fibroblast growth factor receptor 3
+    
+    # Additional Novel Candidates
+    "ANKRD55", # Ankyrin repeat domain 55
+    "FAM177A", # Family with sequence similarity 177 member A
+    "PLCL2",   # Phospholipase C like 2
+    "PSORS1C1", # Psoriasis susceptibility 1 candidate 1
+    "RP11-718O11.1", # Non-coding RNA
+    "ARL15",   # ADP ribosylation factor like GTPase 15
+    "GPS3",    # Glutathione peroxidase 3 (novel hub gene)
+    
+    # Epigenetic Regulators
+    "HDAC1",   # Histone deacetylase 1
+    "HDAC4",   # Histone deacetylase 4
+    "TET2",    # Tet methylcytosine dioxygenase 2
+    "DNMT1",   # DNA methyltransferase 1
+    
+    # Long Non-coding RNAs
+    "NEAT1",   # Nuclear paraspeckle assembly transcript 1
+    "MALAT1",  # Metastasis associated lung adenocarcinoma transcript 1
+    "HOTAIR",  # HOX transcript antisense RNA
+    
+    # MicroRNA Host Genes
+    "MIR146A", # MicroRNA 146a
+    "MIR155HG", # MIR155 host gene
+    "MIR21",   # MicroRNA 21
+    
+    # Additional Risk Loci from Recent Studies
+    "COG6",    # Component of oligomeric golgi complex 6
+    "IKZF1",   # IKAROS family zinc finger 1
+    "IRF4",    # Interferon regulatory factor 4
+    "IRF8",    # Interferon regulatory factor 8
+    "BANK1",   # B cell scaffold protein with ankyrin repeats 1
+    "BLK",     # BLK proto-oncogene (confirmed)
+    "LY9",     # Lymphocyte antigen 9
+    "TNFSF4",  # TNF superfamily member 4
+    "IRAK1",   # Interleukin 1 receptor associated kinase 1
+    "MECP2",   # Methyl-CpG binding protein 2
+    "PLD4",    # Phospholipase D family member 4
+    "ARID5B",  # AT-rich interaction domain 5B
+    "MST1",    # Macrophage stimulating 1
+    "YDJC"     # YdjC chitooligosaccharide deacetylase homolog
+]
+
 # class SimplePharmGKBExtractor:
 #     """
 #     Simple script to extract all rheumatoid arthritis data from PharmGKB API.
