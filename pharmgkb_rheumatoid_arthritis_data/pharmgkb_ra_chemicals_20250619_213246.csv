@@ -1,9 +1,0 @@
-objCls,id,name,inChi,pediatric,smiles,types
-Chemical,PA450428,methotrexate,"InChI=1S/C20H22N8O5/c1-28(9-11-8-23-17-15(24-11)16(21)26-20(22)27-17)12-4-2-10(3-5-12)18(31)25-13(19(32)33)6-7-14(29)30/h2-5,8,13H,6-7,9H2,1H3,(H,25,31)(H,29,30)(H,32,33)(H4,21,22,23,26,27)/t13-/m0/s1",True,CN(CC1=CN=C2C(=N1)C(=NC(=N2)N)N)C3=CC=C(C=C3)C(=O)N[C@@H](CCC(=O)O)C(=O)O,['Drug']
-Chemical,PA10004,adalimumab,,False,,['Drug']
-Chemical,PA449515,etanercept,,False,,['Drug']
-Chemical,PA452639,infliximab,,False,,['Drug']
-Chemical,PA451261,rituximab,,False,,['Drug']
-Chemical,PA165292659,tocilizumab,,False,,['Drug']
-Chemical,PA166211901,tofacitinib,,False,,['Drug']
-Chemical,PA451547,sulfasalazine,"InChI=1S/C18H14N4O5S/c23-16-9-6-13(11-15(16)18(24)25)21-20-12-4-7-14(8-5-12)28(26,27)22-17-3-1-2-10-19-17/h1-11,20H,(H,19,22)(H,24,25)/b21-13-",False,C1=CC=NC(=C1)NS(=O)(=O)C2=CC=C(C=C2)N/N=C\3/C=CC(=O)C(=C3)C(=O)O,['Drug']

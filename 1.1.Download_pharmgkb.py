@@ -1,19 +1,11 @@
 import requests
 import json
 import time
-import pandas as pd
 from datetime import datetime
-import os
 
-#List of genes associated with rheumatoid arthiritis based on literature search - extract all data associated with them
-gene_list_RA = [ # HLA Genes (Strongest Overall Risk)
-    
-
-
-
-
-
-    
+# List of genes associated with rheumatoid arthritis based on literature search
+gene_list_RA = [
+    # HLA Genes (Strongest Overall Risk)
     "HLA-DRB1",
     "HLA-B",
     "HLA-MICA",
@@ -142,7 +134,6 @@ gene_list_RA = [ # HLA Genes (Strongest Overall Risk)
     "FAM177A", # Family with sequence similarity 177 member A
     "PLCL2",   # Phospholipase C like 2
     "PSORS1C1", # Psoriasis susceptibility 1 candidate 1
-    "RP11-718O11.1", # Non-coding RNA
     "ARL15",   # ADP ribosylation factor like GTPase 15
     "GPS3",    # Glutathione peroxidase 3 (novel hub gene)
     
@@ -168,7 +159,6 @@ gene_list_RA = [ # HLA Genes (Strongest Overall Risk)
     "IRF4",    # Interferon regulatory factor 4
     "IRF8",    # Interferon regulatory factor 8
     "BANK1",   # B cell scaffold protein with ankyrin repeats 1
-    "BLK",     # BLK proto-oncogene (confirmed)
     "LY9",     # Lymphocyte antigen 9
     "TNFSF4",  # TNF superfamily member 4
     "IRAK1",   # Interleukin 1 receptor associated kinase 1
@@ -179,428 +169,271 @@ gene_list_RA = [ # HLA Genes (Strongest Overall Risk)
     "YDJC"     # YdjC chitooligosaccharide deacetylase homolog
 ]
 
-# class SimplePharmGKBExtractor:
-#     """
-#     Simple script to extract all rheumatoid arthritis data from PharmGKB API.
-#     """
+class PharmGKBAPI:
+    def __init__(self, max_requests_per_second=0.5):  # Much slower: 1 request every 2 seconds
+        self.last_request_time = 0
+        self.min_interval = 1.0 / max_requests_per_second  # 2 seconds between requests
+        
+    def _rate_limit(self):
+        """Ensure we don't exceed the rate limit"""
+        current_time = time.time()
+        time_since_last = current_time - self.last_request_time
+        
+        if time_since_last < self.min_interval:
+            sleep_time = self.min_interval - time_since_last
+            print(f"⏳ Rate limiting: sleeping for {sleep_time:.1f} seconds...")
+            time.sleep(sleep_time)
+        
+        self.last_request_time = time.time()
     
-#     def __init__(self):
-#         self.base_url = "https://api.pharmgkb.org/v1"
-#         self.headers = {
-#             'Accept': 'application/json',
-#             'User-Agent': 'PharmGKB-RA-Extractor/1.0'
-#         }
-#         self.disease_term = "rheumatoid arthritis"
+    def get_gene_info(self, accession_id=None, symbol=None, view="max"):
+        """Get gene information from PharmGKB API"""
+        self._rate_limit()
         
-#         # Rate limiting - PharmGKB allows max 2 requests per second
-#         self.rate_limit_delay = 0.6
+        base_url = "https://api.pharmgkb.org/v1/data/gene"
+        params = {}
+        if accession_id:
+            params['accessionId'] = accession_id
+        if symbol:
+            params['symbol'] = symbol
+        if view:
+            params['view'] = view
         
-#         # Storage for results
-#         self.results = {
-#             'clinical_annotations': [],
-#             'variant_annotations': [],
-#             'drug_labels': [],
-#             'guidelines': [],
-#             'pathways': [],
-#             'genes': [],
-#             'chemicals': [],
-#             'variants': []
-#         }
-    
-#     def make_request(self, endpoint, params=None):
-#         """Make a rate-limited request to PharmGKB API."""
-#         url = f"{self.base_url}/{endpoint}"
-        
-#         try:
-#             print(f"Requesting: {url} with params: {params}")
-#             time.sleep(self.rate_limit_delay)  # Rate limiting
+        try:
+            print(f"\n{'='*60}")
+            print(f"🧬 FETCHING GENE: {symbol or accession_id}")
+            print(f"🕐 Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            print(f"{'='*60}")
             
-#             response = requests.get(url, headers=self.headers, params=params, timeout=30)
+            response = requests.get(base_url, params=params)
+            response.raise_for_status()
             
-#             if response.status_code == 200:
-#                 data = response.json()
-#                 print(f"✅ Success: Found data")
-#                 return data
-#             elif response.status_code == 429:
-#                 print("⚠️  Rate limit hit, waiting 5 seconds...")
-#                 time.sleep(5)
-#                 return self.make_request(endpoint, params)
-#             else:
-#                 print(f"❌ Failed: {response.status_code}")
-#                 return None
+            gene_data = response.json()
+            
+            if isinstance(gene_data, dict):
+                print(f"✅ SUCCESS - Gene found!")
+                print(f"   Symbol: {gene_data.get('symbol', 'N/A')}")
+                print(f"   Name: {gene_data.get('name', 'N/A')}")
+                print(f"   PharmGKB ID: {gene_data.get('objCls', 'N/A')}")
+                print(f"   Chromosome: {gene_data.get('chromosome', 'N/A')}")
                 
-#         except Exception as e:
-#             print(f"❌ Error: {str(e)}")
-#             return None
+                # Show key fields with truncation for large data
+                important_fields = ['type', 'version', 'hasVariantAnnotation', 'hasVip', 
+                                  'pharmgkbAccessionId', 'crossReferences', 'variants', 
+                                  'relatedDrugs', 'relatedDiseases', 'relatedPathways']
+                
+                for field in important_fields:
+                    if field in gene_data:
+                        value = gene_data[field]
+                        if isinstance(value, list):
+                            print(f"   {field}: [{len(value)} items]")
+                            if len(value) > 0 and field in ['relatedDiseases', 'relatedDrugs', 'relatedPathways']:
+                                print(f"      First few: {[item.get('name', str(item)[:50]) if isinstance(item, dict) else str(item)[:50] for item in value[:3]]}")
+                        elif isinstance(value, dict):
+                            print(f"   {field}: {dict} with {len(value)} keys")
+                        else:
+                            print(f"   {field}: {value}")
+                            
+            elif isinstance(gene_data, list):
+                print(f"✅ SUCCESS - Found {len(gene_data)} results")
+                for i, item in enumerate(gene_data[:3]):  # Show first 3
+                    print(f"   Result {i+1}: {item.get('symbol', 'N/A')} - {item.get('name', 'N/A')}")
+            else:
+                print(f"⚠️  Unexpected response format")
+                print(json.dumps(gene_data, indent=2)[:500])
+            
+            return gene_data
+            
+        except requests.exceptions.RequestException as e:
+            print(f"❌ ERROR: API request failed for {symbol}: {e}")
+            return None
+        except json.JSONDecodeError as e:
+            print(f"❌ ERROR: JSON parsing failed for {symbol}: {e}")
+            return None
+        except Exception as e:
+            print(f"❌ ERROR: Unexpected error for {symbol}: {e}")
+            return None
     
-#     def extract_data_from_response(self, response):
-#         """Extract data array from API response."""
-#         if not response:
-#             return []
+    def get_disease_info(self, accession_id=None, name=None, view="max"):
+        """Get disease information from PharmGKB API"""
+        self._rate_limit()
         
-#         if isinstance(response, dict):
-#             # Try different possible data fields
-#             if 'data' in response:
-#                 return response['data'] if isinstance(response['data'], list) else [response['data']]
-#             elif 'results' in response:
-#                 return response['results'] if isinstance(response['results'], list) else [response['results']]
-#             else:
-#                 return [response]
-#         elif isinstance(response, list):
-#             return response
-#         else:
-#             return []
-    
-#     def search_clinical_annotations(self):
-#         """Search for clinical annotations related to rheumatoid arthritis."""
-#         print("\n🔍 Searching Clinical Annotations...")
+        base_url = "https://api.pharmgkb.org/v1/data/disease"
+        params = {}
+        if accession_id:
+            params['accessionId'] = accession_id
+        if name:
+            params['name'] = name
+        if view:
+            params['view'] = view
         
-#         # Try different endpoint patterns and parameters
-#         search_attempts = [
-#             ('data/clinicalAnnotation', {'q': self.disease_term}),
-#             ('data/clinicalAnnotation', {'search': self.disease_term}),
-#             ('data/clinicalAnnotation', {'disease': self.disease_term}),
-#             ('data/clinicalAnnotation', {'indication': self.disease_term}),
-#             ('clinicalAnnotation', {'q': self.disease_term}),
-#         ]
-        
-#         for endpoint, params in search_attempts:
-#             response = self.make_request(endpoint, params)
-#             if response:
-#                 data = self.extract_data_from_response(response)
-#                 if data:
-#                     self.results['clinical_annotations'].extend(data)
-#                     print(f"Found {len(data)} clinical annotations")
-#                     break
-        
-#         print(f"Total clinical annotations: {len(self.results['clinical_annotations'])}")
-    
-#     def search_variant_annotations(self):
-#         """Search for variant annotations related to rheumatoid arthritis."""
-#         print("\n🔍 Searching Variant Annotations...")
-        
-#         search_attempts = [
-#             ('data/variantAnnotation', {'q': self.disease_term}),
-#             ('data/variantAnnotation', {'disease': self.disease_term}),
-#             ('data/variantAnnotation', {'phenotype': self.disease_term}),
-#             ('variantAnnotation', {'q': self.disease_term}),
-#         ]
-        
-#         for endpoint, params in search_attempts:
-#             response = self.make_request(endpoint, params)
-#             if response:
-#                 data = self.extract_data_from_response(response)
-#                 if data:
-#                     self.results['variant_annotations'].extend(data)
-#                     print(f"Found {len(data)} variant annotations")
-#                     break
-        
-#         print(f"Total variant annotations: {len(self.results['variant_annotations'])}")
-    
-#     def search_drug_labels(self):
-#         """Search for drug labels related to rheumatoid arthritis."""
-#         print("\n🔍 Searching Drug Labels...")
-        
-#         search_attempts = [
-#             ('data/drugLabel', {'q': self.disease_term}),
-#             ('data/drugLabel', {'indication': self.disease_term}),
-#             ('drugLabel', {'q': self.disease_term}),
-#         ]
-        
-#         for endpoint, params in search_attempts:
-#             response = self.make_request(endpoint, params)
-#             if response:
-#                 data = self.extract_data_from_response(response)
-#                 if data:
-#                     self.results['drug_labels'].extend(data)
-#                     print(f"Found {len(data)} drug labels")
-#                     break
-        
-#         print(f"Total drug labels: {len(self.results['drug_labels'])}")
-    
-#     def search_guidelines(self):
-#         """Search for dosing guidelines related to rheumatoid arthritis."""
-#         print("\n🔍 Searching Guidelines...")
-        
-#         search_attempts = [
-#             ('data/guideline', {'q': self.disease_term}),
-#             ('data/guideline', {'disease': self.disease_term}),
-#             ('guideline', {'q': self.disease_term}),
-#         ]
-        
-#         for endpoint, params in search_attempts:
-#             response = self.make_request(endpoint, params)
-#             if response:
-#                 data = self.extract_data_from_response(response)
-#                 if data:
-#                     self.results['guidelines'].extend(data)
-#                     print(f"Found {len(data)} guidelines")
-#                     break
-        
-#         print(f"Total guidelines: {len(self.results['guidelines'])}")
-    
-#     def search_pathways(self):
-#         """Search for pathways related to rheumatoid arthritis."""
-#         print("\n🔍 Searching Pathways...")
-        
-#         search_attempts = [
-#             ('data/pathway', {'q': self.disease_term}),
-#             ('data/pathway', {'disease': self.disease_term}),
-#             ('pathway', {'q': self.disease_term}),
-#         ]
-        
-#         for endpoint, params in search_attempts:
-#             response = self.make_request(endpoint, params)
-#             if response:
-#                 data = self.extract_data_from_response(response)
-#                 if data:
-#                     self.results['pathways'].extend(data)
-#                     print(f"Found {len(data)} pathways")
-#                     break
-        
-#         print(f"Total pathways: {len(self.results['pathways'])}")
-    
-#     def search_by_known_ra_drugs(self):
-#         """Search using known rheumatoid arthritis drugs."""
-#         print("\n🔍 Searching by Known RA Drugs...")
-        
-#         ra_drugs = [
-#             'methotrexate', 'adalimumab', 'etanercept', 'infliximab',
-#             'rituximab', 'tocilizumab', 'tofacitinib', 'sulfasalazine'
-#         ]
-        
-#         for drug in ra_drugs:
-#             print(f"  Searching for drug: {drug}")
+        try:
+            print(f"\n{'='*60}")
+            print(f"🏥 FETCHING DISEASE: {name or accession_id}")
+            print(f"🕐 Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            print(f"{'='*60}")
             
-#             # Search clinical annotations for this drug
-#             response = self.make_request('data/clinicalAnnotation', {'drug': drug})
-#             if response:
-#                 data = self.extract_data_from_response(response)
-#                 self.results['clinical_annotations'].extend(data)
-#                 print(f"    Found {len(data)} clinical annotations")
+            response = requests.get(base_url, params=params)
+            response.raise_for_status()
             
-#             # Search variant annotations for this drug
-#             response = self.make_request('data/variantAnnotation', {'drug': drug})
-#             if response:
-#                 data = self.extract_data_from_response(response)
-#                 self.results['variant_annotations'].extend(data)
-#                 print(f"    Found {len(data)} variant annotations")
+            disease_data = response.json()
             
-#             # Search drug labels
-#             response = self.make_request('data/drugLabel', {'drug': drug})
-#             if response:
-#                 data = self.extract_data_from_response(response)
-#                 self.results['drug_labels'].extend(data)
-#                 print(f"    Found {len(data)} drug labels")
+            if isinstance(disease_data, dict):
+                print(f"✅ SUCCESS - Disease found!")
+                print(f"   Name: {disease_data.get('name', 'N/A')}")
+                print(f"   PharmGKB ID: {disease_data.get('pharmgkbAccessionId', 'N/A')}")
+                print(f"   Object Class: {disease_data.get('objCls', 'N/A')}")
+                
+                # Show important disease-specific fields
+                important_fields = ['type', 'version', 'alternateNames', 'crossReferences', 
+                                  'relatedGenes', 'relatedDrugs', 'relatedPathways', 
+                                  'clinicalAnnotations', 'variantAnnotations']
+                
+                for field in important_fields:
+                    if field in disease_data:
+                        value = disease_data[field]
+                        if isinstance(value, list):
+                            print(f"   {field}: [{len(value)} items]")
+                            if len(value) > 0 and field in ['relatedGenes', 'relatedDrugs', 'relatedPathways']:
+                                print(f"      First few: {[item.get('name', str(item)[:50]) if isinstance(item, dict) else str(item)[:50] for item in value[:5]]}")
+                        elif isinstance(value, dict):
+                            print(f"   {field}: {dict} with {len(value)} keys")
+                        else:
+                            print(f"   {field}: {value}")
+                            
+            elif isinstance(disease_data, list):
+                print(f"✅ SUCCESS - Found {len(disease_data)} results")
+                for i, item in enumerate(disease_data[:3]):  # Show first 3
+                    print(f"   Result {i+1}: {item.get('name', 'N/A')} - ID: {item.get('pharmgkbAccessionId', 'N/A')}")
+            else:
+                print(f"⚠️  Unexpected response format")
+                print(json.dumps(disease_data, indent=2)[:500])
             
-#             # Get chemical information
-#             response = self.make_request('data/chemical', {'name': drug})
-#             if response:
-#                 data = self.extract_data_from_response(response)
-#                 self.results['chemicals'].extend(data)
-#                 print(f"    Found {len(data)} chemical records")
-    
-#     def search_by_known_ra_genes(self):
-#         """Search using known rheumatoid arthritis genes."""
-#         print("\n🔍 Searching by Known RA Genes...")
-        
-#         ra_genes = [
-#             'MTHFR', 'TNF', 'IL6', 'PTPN22', 'STAT4', 'RFC1', 'SLC19A1',
-#             'ABCB1', 'HLA-DRB1', 'DHFR', 'FPGS', 'GGH'
-#         ]
-        
-#         for gene in ra_genes:
-#             print(f"  Searching for gene: {gene}")
+            return disease_data
             
-#             # Search variant annotations for this gene
-#             response = self.make_request('data/variantAnnotation', {'gene': gene})
-#             if response:
-#                 data = self.extract_data_from_response(response)
-#                 self.results['variant_annotations'].extend(data)
-#                 print(f"    Found {len(data)} variant annotations")
-            
-#             # Get gene information
-#             response = self.make_request('data/gene', {'symbol': gene})
-#             if response:
-#                 data = self.extract_data_from_response(response)
-#                 self.results['genes'].extend(data)
-#                 print(f"    Found {len(data)} gene records")
-            
-#             # Search for variants
-#             response = self.make_request('data/variant', {'gene': gene})
-#             if response:
-#                 data = self.extract_data_from_response(response)
-#                 self.results['variants'].extend(data)
-#                 print(f"    Found {len(data)} variants")
-    
-#     def get_all_data(self):
-#         """Get all available data from different endpoints."""
-#         print("\n🔍 Getting All Available Data...")
-        
-#         # Try to get all data from each endpoint
-#         endpoints = [
-#             'data/clinicalAnnotation',
-#             'data/variantAnnotation', 
-#             'data/drugLabel',
-#             'data/guideline',
-#             'data/pathway',
-#             'data/gene',
-#             'data/chemical',
-#             'data/variant'
-#         ]
-        
-#         for endpoint in endpoints:
-#             print(f"  Getting all data from: {endpoint}")
-#             response = self.make_request(endpoint, {'limit': 1000})
-#             if response:
-#                 data = self.extract_data_from_response(response)
-#                 endpoint_name = endpoint.split('/')[-1]
-#                 if endpoint_name in self.results:
-#                     # Filter for rheumatoid arthritis related data
-#                     ra_related = self.filter_ra_related(data)
-#                     self.results[endpoint_name].extend(ra_related)
-#                     print(f"    Found {len(ra_related)} RA-related records out of {len(data)} total")
-    
-#     def filter_ra_related(self, data):
-#         """Filter data to only include rheumatoid arthritis related records."""
-#         ra_keywords = [
-#             'rheumatoid', 'arthritis', 'RA', 'inflammatory arthritis',
-#             'methotrexate', 'adalimumab', 'etanercept', 'TNF', 'MTX'
-#         ]
-        
-#         filtered = []
-#         for record in data:
-#             if isinstance(record, dict):
-#                 # Convert record to string and check for keywords
-#                 record_str = json.dumps(record).lower()
-#                 if any(keyword.lower() in record_str for keyword in ra_keywords):
-#                     filtered.append(record)
-        
-#         return filtered
-    
-#     def remove_duplicates(self):
-#         """Remove duplicate records from results."""
-#         print("\n🔄 Removing duplicates...")
-        
-#         for data_type in self.results:
-#             original_count = len(self.results[data_type])
-            
-#             # Remove duplicates based on string representation
-#             unique_data = []
-#             seen = set()
-            
-#             for item in self.results[data_type]:
-#                 item_str = json.dumps(item, sort_keys=True) if isinstance(item, dict) else str(item)
-#                 if item_str not in seen:
-#                     seen.add(item_str)
-#                     unique_data.append(item)
-            
-#             self.results[data_type] = unique_data
-#             duplicate_count = original_count - len(unique_data)
-            
-#             if duplicate_count > 0:
-#                 print(f"  {data_type}: Removed {duplicate_count} duplicates ({len(unique_data)} unique)")
-#             else:
-#                 print(f"  {data_type}: {len(unique_data)} records (no duplicates)")
-    
-#     def save_results(self):
-#         """Save results to files."""
-#         print("\n💾 Saving results...")
-        
-#         # Create output directory
-#         output_dir = "pharmgkb_rheumatoid_arthritis_data"
-#         os.makedirs(output_dir, exist_ok=True)
-        
-#         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
-#         # Save complete results as JSON
-#         json_file = f"{output_dir}/pharmgkb_ra_complete_{timestamp}.json"
-#         with open(json_file, 'w') as f:
-#             json.dump(self.results, f, indent=2, default=str)
-#         print(f"✅ Saved complete data: {json_file}")
-        
-#         # Save each data type as separate CSV
-#         total_records = 0
-#         for data_type, records in self.results.items():
-#             if records:
-#                 try:
-#                     df = pd.json_normalize(records)
-#                     csv_file = f"{output_dir}/pharmgkb_ra_{data_type}_{timestamp}.csv"
-#                     df.to_csv(csv_file, index=False)
-#                     total_records += len(records)
-#                     print(f"✅ Saved {data_type}: {len(records)} records → {csv_file}")
-#                 except Exception as e:
-#                     print(f"❌ Error saving {data_type}: {str(e)}")
-        
-#         # Save summary
-#         summary = {
-#             'disease': 'rheumatoid arthritis',
-#             'extraction_date': datetime.now().isoformat(),
-#             'total_records': total_records,
-#             'data_types': {k: len(v) for k, v in self.results.items()}
-#         }
-        
-#         summary_file = f"{output_dir}/extraction_summary_{timestamp}.json"
-#         with open(summary_file, 'w') as f:
-#             json.dump(summary, f, indent=2)
-        
-#         print(f"\n📊 EXTRACTION SUMMARY:")
-#         print(f"   Total Records: {total_records}")
-#         for data_type, count in summary['data_types'].items():
-#             print(f"   {data_type}: {count}")
-#         print(f"   Output Directory: {output_dir}")
-        
-#         return summary
-    
-#     def run_extraction(self):
-#         """Run the complete extraction process."""
-#         print("🚀 Starting PharmGKB Rheumatoid Arthritis Data Extraction")
-#         print("="*60)
-        
-#         try:
-#             # Method 1: Search by disease name
-#             self.search_clinical_annotations()
-#             self.search_variant_annotations()
-#             self.search_drug_labels()
-#             self.search_guidelines()
-#             self.search_pathways()
-            
-#             # Method 2: Search by known RA drugs
-#             self.search_by_known_ra_drugs()
-            
-#             # Method 3: Search by known RA genes
-#             self.search_by_known_ra_genes()
-            
-#             # Method 4: Get all data and filter
-#             # self.get_all_data()  # Uncomment if you want to try this approach
-            
-#             # Clean up data
-#             self.remove_duplicates()
-            
-#             # Save results
-#             summary = self.save_results()
-            
-#             print("\n🎉 EXTRACTION COMPLETED SUCCESSFULLY!")
-#             print("="*60)
-            
-#             return self.results, summary
-            
-#         except Exception as e:
-#             print(f"\n❌ EXTRACTION FAILED: {str(e)}")
-#             raise
+        except requests.exceptions.RequestException as e:
+            print(f"❌ ERROR: API request failed for {name or accession_id}: {e}")
+            return None
+        except json.JSONDecodeError as e:
+            print(f"❌ ERROR: JSON parsing failed for {name or accession_id}: {e}")
+            return None
+        except Exception as e:
+            print(f"❌ ERROR: Unexpected error for {name or accession_id}: {e}")
+            return None
 
-
-# def main():
-#     """Main function to run the extraction."""
-#     extractor = SimplePharmGKBExtractor()
-#     results, summary = extractor.run_extraction()
+def save_results_to_file(gene_results, disease_results, filename="pharmgkb_results.json"):
+    """Save all results to a JSON file"""
+    results = {
+        "metadata": {
+            "timestamp": datetime.now().isoformat(),
+            "pharmgkb_api_version": "v1",
+            "rate_limit": "0.5 requests per second (1 request every 2 seconds)",
+            "total_runtime_minutes": None  # Will be updated at the end
+        },
+        "rheumatoid_arthritis_disease": disease_results,
+        "gene_results": gene_results,
+        "summary": {
+            "total_genes_queried": len(gene_list_RA),
+            "successful_gene_queries": len([r for r in gene_results.values() if r is not None]),
+            "failed_gene_queries": len([r for r in gene_results.values() if r is None]),
+            "genes_with_ra_associations": [],  # Will be populated during analysis
+            "disease_queries_completed": len(disease_results)
+        }
+    }
     
-#     print(f"\nExtraction complete! Found {summary['total_records']} total records.")
-#     print("Check the 'pharmgkb_rheumatoid_arthritis_data' directory for output files.")
+    # Analyze which genes have RA associations
+    for gene_symbol, gene_data in gene_results.items():
+        if gene_data and isinstance(gene_data, dict):
+            related_diseases = gene_data.get('relatedDiseases', [])
+            if any('rheumatoid' in str(disease).lower() or 'arthritis' in str(disease).lower() 
+                   for disease in related_diseases):
+                results["summary"]["genes_with_ra_associations"].append(gene_symbol)
     
-#     return results
+    with open(filename, 'w') as f:
+        json.dump(results, f, indent=2)
+    
+    print(f"\n💾 Results saved to {filename}")
+    return results
 
+if __name__ == "__main__":
+    start_time = time.time()
+    
+    # Initialize API client with slower rate limiting
+    api = PharmGKBAPI(max_requests_per_second=0.5)  # 1 request every 2 seconds
+    
+    # Store results
+    gene_results = {}
+    disease_results = {}
+    
+    print(f"""
+{'='*80}
+🚀 PHARMGKB RHEUMATOID ARTHRITIS DATA EXTRACTION
+{'='*80}
+📊 Total genes to query: {len(gene_list_RA)}
+⏱️  Rate limit: 1 request every 2 seconds (0.5 requests/second)
+⌚ Estimated time for genes: {len(gene_list_RA) * 2 / 60:.1f} minutes
+🎯 Primary target: Rheumatoid Arthritis (PA443434)
+{'='*80}
+""")
+    
+    # First, extract rheumatoid arthritis disease information using the specific PharmGKB ID
+    print(f"\n🎯 STEP 1: Extracting Rheumatoid Arthritis Disease Information")
+    print(f"{'='*60}")
+    
+    ra_disease_info = api.get_disease_info(accession_id="PA443434", view="max")
+    disease_results["rheumatoid_arthritis_PA443434"] = ra_disease_info
+    
+    # Also try by name as backup
+    ra_by_name = api.get_disease_info(name="rheumatoid arthritis", view="max")
+    disease_results["rheumatoid_arthritis_by_name"] = ra_by_name
+    
+    print(f"\n🧬 STEP 2: Extracting Gene Information for {len(gene_list_RA)} RA-Associated Genes")
+    print(f"{'='*60}")
+    
+    # Query gene information for each gene in the list
+    for i, gene in enumerate(gene_list_RA, 1):
+        elapsed_time = (time.time() - start_time) / 60
+        remaining_genes = len(gene_list_RA) - i + 1
+        estimated_remaining_time = remaining_genes * 2 / 60
+        
+        print(f"\n📈 PROGRESS: {i}/{len(gene_list_RA)} ({i/len(gene_list_RA)*100:.1f}%)")
+        print(f"⏰ Elapsed: {elapsed_time:.1f} min | Estimated remaining: {estimated_remaining_time:.1f} min")
+        
+        gene_info = api.get_gene_info(symbol=gene, view="max")
+        gene_results[gene] = gene_info
+        
+        # Save intermediate results every 20 genes to prevent data loss
+        if i % 20 == 0:
+            intermediate_filename = f"intermediate_results_{i}_genes.json"
+            save_results_to_file(gene_results, disease_results, intermediate_filename)
+            print(f"💾 Intermediate save: {intermediate_filename}")
+    
+    # Calculate total runtime
+    total_runtime = (time.time() - start_time) / 60
+    
+    # Save final comprehensive results
+    final_results = save_results_to_file(gene_results, disease_results, "pharmgkb_ra_comprehensive_results.json")
+    final_results["metadata"]["total_runtime_minutes"] = total_runtime
+    
+    # Update the file with runtime info
+    with open("pharmgkb_ra_comprehensive_results.json", 'w') as f:
+        json.dump(final_results, f, indent=2)
+    
+    # Print final summary
+    print(f"""
+{'='*80}
+📊 FINAL SUMMARY
+{'='*80}
+✅ Total genes queried: {len(gene_list_RA)}
+🎯 Successful gene queries: {len([r for r in gene_results.values() if r is not None])}
+❌ Failed gene queries: {len([r for r in gene_results.values() if r is None])}
+🏥 Disease queries completed: {len(disease_results)}
+⏱️  Total runtime: {total_runtime:.1f} minutes
+💾 Results saved to: pharmgkb_ra_comprehensive_results.json
 
-# if __name__ == "__main__":
-#     # Run the extraction
-#     main()
+🧬 Genes with RA associations: {len(final_results["summary"]["genes_with_ra_associations"])}
+{final_results["summary"]["genes_with_ra_associations"][:10]}{'...' if len(final_results["summary"]["genes_with_ra_associations"]) > 10 else ''}
+
+✨ Data extraction complete!
+{'='*80}
+""")
